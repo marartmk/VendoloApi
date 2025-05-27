@@ -18,5 +18,6 @@ namespace VendoloApi.Models
         public string nome { get; set; }
         public int quantita { get; set; }
         public string turno { get; set; }
+        public decimal prezzo { get; set; }
     }
 }

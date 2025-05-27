@@ -451,7 +451,8 @@ namespace VendoloApi.Controllers
                 idProdotto AS piattoId,
                 Descrizione AS nome,
                 Qta AS quantita,
-                Turno AS turno
+                Turno AS turno,
+                Prezzo AS prezzo
             FROM resturant_floor_orders
             WHERE IdOrdine = @IdOrdine AND IdTavolo = @IdTavolo AND IdCompany = @IdCompany AND IsDeleted = 0";
 
@@ -470,7 +471,8 @@ namespace VendoloApi.Controllers
                         piattoId = readerDettagli.GetGuid(0),
                         nome = readerDettagli.GetString(1),
                         quantita = readerDettagli.GetInt32(2),
-                        turno = readerDettagli.GetString(3)
+                        turno = readerDettagli.GetString(3),
+                        prezzo = readerDettagli.GetDecimal(4)
                     });
                 }
 
@@ -546,6 +548,70 @@ namespace VendoloApi.Controllers
                 Console.WriteLine("❌ Errore sendToKitchen: " + ex.Message);
                 return InternalServerError(new Exception("Errore durante invio della comanda in cucina", ex));
             }
+        }
+
+        [HttpPost]
+        [Route("api/test/closeTable")]
+        public IHttpActionResult CloseTable([FromBody] ComandaMovements request)
+        {
+            if (string.IsNullOrWhiteSpace(request.IdCompany) || string.IsNullOrWhiteSpace(request.IdTavolo))
+                return Content(HttpStatusCode.BadRequest, new { success = false, message = "IdCompany o IdCategoria mancanti" });
+
+            try
+            {
+                DateTime dataChiusura = DateTime.Now;
+                string oraChiusura = dataChiusura.ToString("HH:mm:ss");
+                decimal importo = getImportoTavolo(request.IdCompany, request.IdCompany);
+
+                string SQLstr = ConfigurationManager.ConnectionStrings["CloudConnection"].ConnectionString;
+
+                string strUpdateQuery = @"UPDATE resturant_orders SET                                             
+                                             Stato = @Stato                                             
+                                        WHERE
+                                             IdTavolo = @IdTavolo AND
+                                             IdCompany = @IdCompany";
+
+                SqlConnection SqlConnAcc = new SqlConnection(SQLstr);
+                SqlConnAcc.Open();
+
+                SqlCommand cmd2 = new SqlCommand();
+                cmd2.Connection = SqlConnAcc;
+                cmd2.CommandType = CommandType.Text;
+                cmd2.CommandText = strUpdateQuery;
+
+
+                cmd2.Parameters.Add("@IdCompany", SqlDbType.UniqueIdentifier).Value = new Guid(request.IdCompany);
+                cmd2.Parameters.Add("@IdTavolo", SqlDbType.UniqueIdentifier).Value = new Guid(request.IdCompany);
+                cmd2.Parameters.Add("@DataChiusura", SqlDbType.DateTime).Value = dataChiusura;
+                cmd2.Parameters.Add("@OraChiusura", SqlDbType.UniqueIdentifier).Value = oraChiusura;
+                cmd2.Parameters.Add("@Importo", SqlDbType.UniqueIdentifier).Value = importo;
+                cmd2.Parameters.Add("@Stato", SqlDbType.Int).Value = 0;
+
+                cmd2.ExecuteNonQuery();
+                cmd2.Parameters.Clear();
+
+                string messageTxt = "Ordinazione inviata in cucina correttamente";
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Order successfully sent to kitchen",
+                    tableId = request.IdTavolo
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("❌ Errore sendToKitchen: " + ex.Message);
+                return InternalServerError(new Exception("Errore durante invio della comanda in cucina", ex));
+            }
+        }
+
+        private decimal getImportoTavolo(string idCompany, string idTavolo)
+        {
+            decimal importTavolo = 0;
+
+
+            return importTavolo;
         }
 
         private bool IsProductPresent(string idTavolo, string idProdotto, string idCompany)
@@ -705,6 +771,7 @@ namespace VendoloApi.Controllers
                     string nome = piatto.nome;
                     int quantita = piatto.quantita;
                     string turno = piatto.turno;
+                    decimal prezzo = piatto.prezzo;
 
                     // Crea un oggetto anonimo
                     var piattoJsonObject = new
@@ -712,7 +779,8 @@ namespace VendoloApi.Controllers
                         piattoId = piattoId,
                         nome = nome,
                         quantita = quantita,
-                        turno = turno
+                        turno = turno,
+                        prezzo = prezzo
                     };
 
                     // Serializza l'oggetto in JSON
@@ -753,8 +821,8 @@ namespace VendoloApi.Controllers
             string nome = piatto.nome;
             int quantita = piatto.quantita;
             string turno = piatto.turno;
+            decimal prezzo = piatto.prezzo;
 
-            decimal prezzo = 0;
             string idCameriere = "00000000-0000-0000-0000-000000000000";
 
             string SQLstr = ConfigurationManager.ConnectionStrings["CloudConnection"].ConnectionString;
